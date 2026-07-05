@@ -1,0 +1,294 @@
+{
+  "1.jpg": [
+    {
+      "index": 0,
+      "min": -20,
+      "max": 60,
+      "unit": "C"
+    }
+  ],
+  "2.jpg": [
+    {
+      "index": 0,
+      "min": 0,
+      "max": 10,
+      "unit": "bar"
+    },
+    {
+      "index": 1,
+      "min": 20,
+      "max": 100,
+      "unit": "C"
+    }
+  ],
+  "3.jpg": [
+    {
+      "index": 0,
+      "min": 0,
+      "max": 3.5,
+      "unit": "MPa"
+    },
+    {
+      "index": 1,
+      "min": 0,
+      "max": 3.5,
+      "unit": "MPa"
+    }
+  ],
+  "4.jpg": [
+    {
+      "index": 0,
+      "min": 0,
+      "max": 10,
+      "unit": "kg/cm2"
+    }
+  ],
+  "5.jpg": [
+    {
+      "index": 0,
+      "min": 0,
+      "max": 1,
+      "unit": "MPa"
+    },
+    {
+      "index": 1,
+      "min": 0,
+      "max": 1,
+      "unit": "MPa"
+    },
+    {
+      "index": 2,
+      "min": 0,
+      "max": 1,
+      "unit": "MPa"
+    }
+  ],
+  "6.jpg": [
+    {
+      "index": 0,
+      "min": 40,
+      "max": 100,
+      "unit": "%"
+    },
+    {
+      "index": 1,
+      "min": 10,
+      "max": 40,
+      "unit": "C"
+    }
+  ],
+  "7.jpg": [
+    {
+      "index": 0,
+      "min": 40,
+      "max": 100,
+      "unit": "%"
+    },
+    {
+      "index": 1,
+      "min": 10,
+      "max": 40,
+      "unit": "C"
+    }
+  ],
+  "8.jpg": [
+    {
+      "index": 0,
+      "min": 10,
+      "max": 40,
+      "unit": "C"
+    },
+    {
+      "index": 1,
+      "min": 20,
+      "max": 90,
+      "unit": "%"
+    }
+  ],
+  "9.jpg": [
+    {
+      "index": 0,
+      "min": 0,
+      "max": 120,
+      "unit": "C"
+    },
+    {
+      "index": 1,
+      "min": 30,
+      "max": 250,
+      "unit": "F"
+    },
+    {
+      "index": 2,
+      "min": 0,
+      "max": 100,
+      "unit": "%"
+    }
+  ],
+  "10.jpg": [
+    {
+      "index": 0,
+      "min": 940,
+      "max": 1060,
+      "unit": "hPa"
+    },
+    {
+      "index": 1,
+      "min": -10,
+      "max": 40,
+      "unit": "C"
+    },
+    {
+      "index": 2,
+      "min": 0,
+      "max": 100,
+      "unit": "%"
+    }
+  ],
+  "11.jpg": [
+    {
+      "index": 0,
+      "min": 20,
+      "max": 100,
+      "unit": "%"
+    },
+    {
+      "index": 1,
+      "min": 0,
+      "max": 120,
+      "unit": "F"
+    },
+    {
+      "index": 2,
+      "min": -20,
+      "max": 50,
+      "unit": "C"
+    }
+  ],
+  "12.jpg": [
+    {
+      "index": 0,
+      "min": 10,
+      "max": 100,
+      "unit": ""
+    },
+    {
+      "index": 1,
+      "min": 20,
+      "max": 110,
+      "unit": ""
+    }
+  ],
+  "13.jpg": [
+    {
+      "index": 0,
+      "min": 0,
+      "max": 100,
+      "unit": "C"
+    }
+  ],
+  "14.jpg": [
+    {
+      "index": 0,
+      "min": 730,
+      "max": 790,
+      "unit": "mmHg"
+    },
+    {
+      "index": 1,
+      "min": 970,
+      "max": 1050,
+      "unit": "hPa"
+    },
+    {
+      "index": 2,
+      "min": -30,
+      "max": 50,
+      "unit": "C"
+    },
+    {
+      "index": 3,
+      "min": 0,
+      "max": 100,
+      "unit": "%"
+    }
+  ],
+  "15.jpg": [
+    {
+      "index": 0,
+      "min": 0,
+      "max": 100,
+      "unit": "C"
+    }
+  ],
+  "16.jpg": [
+    {
+      "index": 0,
+      "min": 0,
+      "max": 50,
+      "unit": "C"
+    }
+  ],
+  "17.jpg": [
+    {
+      "index": 0,
+      "min": 0,
+      "max": 120,
+      "unit": "C"
+    },
+    {
+      "index": 1,
+      "min": 0,
+      "max": 100,
+      "unit": "%"
+    }
+  ],
+  "18.jpg": [
+    {
+      "index": 0,
+      "min": 0,
+      "max": 200,
+      "unit": "C"
+    }
+  ],
+  "19.jpg": [
+    {
+      "index": 0,
+      "min": 730,
+      "max": 790,
+      "unit": "mmHg"
+    },
+    {
+      "index": 1,
+      "min": 970,
+      "max": 1050,
+      "unit": "hPa"
+    },
+    {
+      "index": 2,
+      "min": -30,
+      "max": 50,
+      "unit": "C"
+    },
+    {
+      "index": 3,
+      "min": 0,
+      "max": 100,
+      "unit": "%"
+    }
+  ],
+  "20.jpg": [
+    {
+      "index": 0,
+      "min": 0,
+      "max": 0.6,
+      "unit": "MPa"
+    },
+    {
+      "index": 1,
+      "min": 0,
+      "max": 100,
+      "unit": "C"
+    }
+  ]
+}
