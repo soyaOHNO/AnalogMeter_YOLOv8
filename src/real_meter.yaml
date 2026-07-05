@@ -1,0 +1,9 @@
+kpt_shape:
+- 6
+- 3
+names:
+- meter
+nc: 1
+path: C:\Users\81809\Desktop\YOLO_KeyPoints\yolo_real_dataset
+train: images/train
+val: images/val
