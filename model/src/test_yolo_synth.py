@@ -6,17 +6,24 @@ import numpy as np
 from ultralytics import YOLO
 
 # ==========================================
-# 設定パス (合成データテスト用に変更)
+# 設定パス
 # ==========================================
-# ★ Blenderで出力したCG画像のフォルダパスを指定してください
-IMAGE_DIR = r"..\yolo_test_data\images" 
-MODEL_PATH = r"..\yolo_best\best.pt"  # ダウンロードした学習済みモデル
+# ★ テストしたい画像のフォルダパス（統合テストデータ等）を指定してください
+IMAGE_DIR = r"..\yolo_test_data_all\images" 
+# ★ ダウンロードした72エポック目の best.pt のパスを指定してください
+MODEL_PATH = r"best.pt"  
 
-# CGデータ用の固定メタデータ
-TEST_META = {"min": 0.0, "max": 1.0, "unit": "MPa"}
+from meter_config import META_DATA # メタデータのパス
+
+# 描画用の色設定 (B, G, R)
+COLOR_MAP = {
+    0: (255, 150, 0),  # Atmos: 青系
+    1: (0, 100, 255),  # Thermo: オレンジ系
+    2: (0, 255, 100)   # Hygro: 緑系
+}
 
 # ==========================================
-# 計算ロジック (完全同一)
+# 計算ロジック (変更なし)
 # ==========================================
 def apply_perspective_transform(bbox, kpts):
     x1, y1, x2, y2 = bbox
@@ -55,7 +62,7 @@ def calculate_normalized_ratio(ang_min, ang_mid, ang_max, ang_tip):
 # メイン推論処理
 # ==========================================
 def main():
-    print("=== YOLOv8 CGデータ推論テスト開始 ===")
+    print("=== YOLOv8 万能モデル 推論テスト開始 ===")
     
     model = YOLO(MODEL_PATH)
     
@@ -79,15 +86,23 @@ def main():
 
         if result.boxes and result.keypoints:
             boxes = result.boxes.xyxy.cpu().numpy() 
+            classes = result.boxes.cls.cpu().numpy()  # ★AIが予測したクラスIDを取得
             kpts_all = result.keypoints.xy.cpu().numpy() 
             
             for i in range(len(boxes)):
-                bbox = boxes[i] 
+                bbox = boxes[i]
+                cls_id = int(classes[i])  # ★クラスID (0, 1, 2) を整数化
                 p_kpts = kpts_all[i] 
                 
-                if len(p_kpts) < 6 or np.all(p_kpts == 0):
-                    print(f"{img_name} - Inst {i}: キーポイントが正しく検出されませんでした。")
+                # 未知のクラスIDやキーポイント不足の場合はスキップ
+                if cls_id not in META_DATA:
                     continue
+                if len(p_kpts) < 6 or np.all(p_kpts == 0):
+                    print(f"{img_name} - {META_DATA[cls_id]['name']}: キーポイント検出失敗")
+                    continue
+
+                meta = META_DATA[cls_id]  # ★該当クラスのメタデータを引き出す
+                color = COLOR_MAP.get(cls_id, (0, 255, 0))
 
                 pivot, tip, min_pt, mid_pt, max_pt, center = p_kpts
 
@@ -106,27 +121,32 @@ def main():
                 
                 ratio = calculate_normalized_ratio(ang_min, ang_mid, ang_max, ang_tip)
                 
-                val = TEST_META["min"] + (TEST_META["max"] - TEST_META["min"]) * ratio
+                # ★引き出したメタデータの min と max を使って実際の数値を計算
+                val = meta["min"] + (meta["max"] - meta["min"]) * ratio
                 
-                print(f"{img_name} - Inst {i}: {val:.3f} {TEST_META['unit']} (Ratio: {ratio*100:.1f}%)")
+                print(f"{img_name} - {meta['name']}検出: {val:.1f} {meta['unit']} (Ratio: {ratio*100:.1f}%)")
                 
                 # 描画
                 raw_center = tuple(center.astype(int))
                 raw_shifted_tip = tuple(shifted_tip.astype(int))
                 
-                cv2.rectangle(img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (0, 255, 0), 2)
-                cv2.line(img, tuple(pivot.astype(int)), tuple(tip.astype(int)), (255, 100, 0), 2)
-                cv2.line(img, raw_center, raw_shifted_tip, (255, 255, 0), 2)
+                # バウンディングボックスと線を描画（計器の種類ごとに色分け）
+                cv2.rectangle(img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), color, 2)
+                cv2.line(img, tuple(pivot.astype(int)), tuple(tip.astype(int)), (255, 255, 255), 1)
+                cv2.line(img, raw_center, raw_shifted_tip, color, 2)
                 
                 for pt in p_kpts:
-                    cv2.circle(img, tuple(pt.astype(int)), 5, (0, 0, 255), -1)
+                    cv2.circle(img, tuple(pt.astype(int)), 4, (0, 0, 255), -1)
                 
-                cv2.putText(img, f"{val:.3f}{TEST_META['unit']}", (raw_shifted_tip[0], raw_shifted_tip[1]-15), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 2)
+                # テキスト情報（計器名と数値）を画面上に描画
+                display_text = f"{meta['name']}: {val:.1f}{meta['unit']}"
+                cv2.putText(img, display_text, (raw_shifted_tip[0] - 30, raw_shifted_tip[1] - 15), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
         else:
             print(f"{img_name}: 計器が検出されませんでした。")
 
         cv2.imshow("YOLO Synth Test", img)
+        # qキーで終了、それ以外のキーで次の画像へ
         if cv2.waitKey(0) & 0xFF == ord('q'): break
 
     cv2.destroyAllWindows()

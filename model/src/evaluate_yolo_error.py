@@ -1,154 +1,153 @@
-import cv2
 import os
 import glob
 import math
-import numpy as np
 from ultralytics import YOLO
 
 # ==========================================
-# 設定パス (Blenderで出力したテスト用データ)
+# 設定項目
 # ==========================================
-IMAGE_DIR = r"..\yolo_test_data\images"
-LABEL_DIR = r"..\yolo_test_data\labels"
-MODEL_PATH = r"..\yolo_best\best.pt"  # 学習済みモデル
+IMAGE_DIR = r"..\yolo_test_data_all\images"
+LABEL_DIR = r"..\yolo_test_data_all\labels"
+MODEL_PATH = r"best.pt"  # 学習済みの最強モデル
 
-# 評価用の固定メタデータ (テストなので0.0〜1.0で計算)
-TEST_META = {"min": 0.0, "max": 1.0, "unit": "MPa"}
+# 秘伝のたれ
+from meter_config import META_DATA # メタデータのパス
 
+# ==========================================
+# 角度・数値計算ロジック（バグ修正済）
+# ==========================================
+def calculate_angle(pt, center):
+    """2点間の角度を計算する（画像座標系）"""
+    return math.degrees(math.atan2(pt[1] - center[1], pt[0] - center[0]))
 
-def read_yolo_format(txt_path, img_w, img_h):
-    """正解ラベル(.txt)から座標を読み込む"""
-    loaded_instances = []
-    if not os.path.exists(txt_path): return loaded_instances
-    with open(txt_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            parts = line.strip().split()
-            if len(parts) >= 23:
-                xc, yc, w, h = map(float, parts[1:5])
-                bbox = (int((xc - w/2)*img_w), int((yc - h/2)*img_h), 
-                        int((xc + w/2)*img_w), int((yc + h/2)*img_h))
-                kpts = []
-                for i in range(6):
-                    px = int(float(parts[5 + i*3]) * img_w)
-                    py = int(float(parts[6 + i*3]) * img_h)
-                    kpts.append([px, py])
-                loaded_instances.append({'bbox': bbox, 'kpts': np.array(kpts, dtype=np.float32)})
-    return loaded_instances
+def calculate_meter_value(kpts, meta):
+    """6つのキーポイントから最終的な数値を計算する"""
+    # kpts: [Pivot(0), Tip(1), Min(2), Mid(3), Max(4), Center(5)]
+    pivot = kpts[0]
+    tip = kpts[1]
+    min_pt = kpts[2]
+    max_pt = kpts[4]
 
-def apply_perspective_transform(bbox, kpts):
-    x1, y1, x2, y2 = bbox
-    src_pts = np.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=np.float32)
-    side = max(x2-x1, y2-y1)
-    dst_pts = np.array([[0, 0], [side, 0], [side, side], [0, side]], dtype=np.float32)
-    M = cv2.getPerspectiveTransform(src_pts, dst_pts)
-    transformed_kpts = cv2.perspectiveTransform(kpts.reshape(-1, 1, 2), M).reshape(-1, 2)
-    return transformed_kpts
+    angle_min = calculate_angle(min_pt, pivot)
+    angle_max = calculate_angle(max_pt, pivot)
+    angle_tip = calculate_angle(tip, pivot)
 
-def calculate_angle_clockwise(p1, p2):
-    angle = math.degrees(math.atan2(p2[1] - p1[1], p2[0] - p1[0]))
-    return angle if angle >= 0 else angle + 360
+    # 【重要】0度またぎのバグを防ぐため、Minを0度とした相対角度（0〜360）に正規化する
+    norm_max = (angle_max - angle_min) % 360.0
+    norm_tip = (angle_tip - angle_min) % 360.0
 
-def calculate_normalized_ratio(ang_min, ang_mid, ang_max, ang_tip):
-    def diff(start, end): return (end - start) % 360
-    arc1 = diff(ang_min, ang_mid)
-    arc2 = diff(ang_mid, ang_max)
-    dist_from_min = diff(ang_min, ang_tip)
-    
-    if dist_from_min <= arc1:
-        return 0.5 * (dist_from_min / arc1) if arc1 > 0 else 0.0
-    elif dist_from_min <= arc1 + arc2:
-        dist_from_mid = diff(ang_mid, ang_tip)
-        return 0.5 + 0.5 * (dist_from_mid / arc2) if arc2 > 0 else 0.5
-    else:
-        d_max_to_tip = diff(ang_max, ang_tip)
-        d_tip_to_min = diff(ang_tip, ang_min)
-        if d_max_to_tip <= d_tip_to_min:
-            return 1.0 + 0.5 * (d_max_to_tip / arc2) if arc2 > 0 else 1.0
+    # 針がMin以下、またはMax以上にはみ出た場合のクリッピング処理
+    if norm_tip > norm_max:
+        if 360.0 - norm_tip < norm_tip - norm_max:
+            norm_tip = 0.0  # Min寄りの場合は0にクリップ
         else:
-            return 0.0 - 0.5 * (d_tip_to_min / arc1) if arc1 > 0 else 0.0
-
-def get_meter_value(bbox, kpts):
-    """BBoxと6点から最終的な数値を計算するラッパー関数"""
-    pivot, tip, min_pt, mid_pt, max_pt, center = kpts
-    needle_vector = tip - pivot
-    shifted_tip = center + needle_vector
-    
-    target_pts = np.array([center, shifted_tip, min_pt, mid_pt, max_pt], dtype=np.float32)
-    t_kpts = apply_perspective_transform(bbox, target_pts)
-    t_center, t_tip, t_min, t_mid, t_max = t_kpts
-
-    ang_min = calculate_angle_clockwise(t_center, t_min)
-    ang_mid = calculate_angle_clockwise(t_center, t_mid)
-    ang_max = calculate_angle_clockwise(t_center, t_max)
-    ang_tip = calculate_angle_clockwise(t_center, t_tip)
-    
-    ratio = calculate_normalized_ratio(ang_min, ang_mid, ang_max, ang_tip)
-    return TEST_META["min"] + (TEST_META["max"] - TEST_META["min"]) * ratio
+            norm_tip = norm_max  # Max寄りの場合はMaxにクリップ
+            
+    ratio = norm_tip / norm_max if norm_max > 0 else 0
+    return meta["min"] + ratio * (meta["max"] - meta["min"])
 
 # ==========================================
-# 評価実行
+# GT（正解）データの読み込み
+# ==========================================
+def read_gt_labels(txt_path):
+    gt_data = []
+    if not os.path.exists(txt_path):
+        return gt_data
+        
+    with open(txt_path, 'r') as f:
+        for line in f.readlines():
+            parts = line.strip().split()
+            if len(parts) < 23: continue
+            
+            cls_id = int(parts[0])
+            # kptsは [x, y, visibility] の並び
+            kpt_raw = list(map(float, parts[5:]))
+            kpts = [(kpt_raw[i*3], kpt_raw[i*3+1]) for i in range(6)]
+            gt_data.append({"class_id": cls_id, "kpts": kpts})
+    return gt_data
+
+# ==========================================
+# メイン処理
 # ==========================================
 def main():
     print("=== YOLOv8 誤差(Error)検証開始 ===")
     
     model = YOLO(MODEL_PATH)
-    image_paths = sorted(glob.glob(os.path.join(IMAGE_DIR, "*.jpg")))
+    image_paths = glob.glob(os.path.join(IMAGE_DIR, "*.jpg"))
     
     if not image_paths:
-        print(f"エラー: 画像が見つかりません -> {IMAGE_DIR}")
+        print("画像が見つかりません。")
         return
 
-    errors = []
+    # 50枚だけでテスト
+    image_paths = image_paths[:50]
+    
+    total_error = 0.0
+    total_count = 0
+    max_error = 0.0
+    max_error_file = ""
 
-    print("-" * 60)
-    print(f"{'ファイル名':<15} | {'絶対正解(GT)':<8} | {'AI予測(Pred)':<10} | {'誤差(Error)':<10}")
-    print("-" * 60)
+    print("-" * 75)
+    print(f"{'ファイル名':<20} | {'計器名':<15} | {'正解(GT)':<10} | {'予測(Pred)':<10} | {'誤差(Error)':<10}")
+    print("-" * 75)
 
     for img_path in image_paths:
-        img_name = os.path.basename(img_path)
-        base_name = os.path.splitext(img_name)[0]
-        txt_path = os.path.join(LABEL_DIR, f"{base_name}.txt")
+        base_name = os.path.basename(img_path)
+        txt_path = os.path.join(LABEL_DIR, base_name.replace(".jpg", ".txt"))
         
-        img = cv2.imread(img_path)
-        if img is None: continue
-        img_h, img_w = img.shape[:2]
-
-        # 1. 絶対正解 (Ground Truth) の計算
-        gt_instances = read_yolo_format(txt_path, img_w, img_h)
-        if not gt_instances:
+        gt_list = read_gt_labels(txt_path)
+        if not gt_list:
             continue
-        gt_val = get_meter_value(gt_instances[0]['bbox'], gt_instances[0]['kpts'])
-
-        # 2. AI予測 (Prediction) の計算
-        results = model.predict(source=img, conf=0.5, verbose=False) # ログ抑制
-        result = results[0]
-        
-        if result.boxes and result.keypoints:
-            pred_bbox = result.boxes.xyxy[0].cpu().numpy()
-            pred_kpts = result.keypoints.xy[0].cpu().numpy()
             
-            if len(pred_kpts) == 6 and not np.all(pred_kpts == 0):
-                pred_val = get_meter_value(pred_bbox, pred_kpts)
-                
-                # 3. 誤差の計算
-                error = abs(gt_val - pred_val)
-                errors.append(error)
-                
-                print(f"{img_name:<20} | {gt_val:>8.3f} MPa | {pred_val:>8.3f} MPa | {error:>8.3f} MPa")
-            else:
-                print(f"{img_name:<20} | {gt_val:>8.3f} MPa | {'[キーポイント欠損]':>12} | {'-':>10}")
-        else:
-            print(f"{img_name:<20} | {gt_val:>8.3f} MPa | {'[計器未検出]':>12} | {'-':>10}")
+        results = model.predict(img_path, verbose=False)
+        pred_list = []
+        
+        if results[0].keypoints is not None:
+            # 予測結果をリスト化
+            cls_ids = results[0].boxes.cls.cpu().numpy()
+            kpts_array = results[0].keypoints.xyn.cpu().numpy() # 正規化座標 (xyn) を使用
+            
+            for cls_id, kpts in zip(cls_ids, kpts_array):
+                pred_list.append({"class_id": int(cls_id), "kpts": kpts})
 
-    print("-" * 60)
-    if errors:
-        mae = sum(errors) / len(errors)
-        max_err = max(errors)
-        print(f"✅ 検証完了: {len(errors)} 枚の画像をテストしました。")
-        print(f"📊 平均誤差 (MAE) : {mae:.4f} MPa")
-        print(f"📈 最大誤差 (Max) : {max_err:.4f} MPa")
+        # 【重要】クラスIDが一致するもの同士だけを比較する
+        for gt in gt_list:
+            cls_id = gt["class_id"]
+            if cls_id not in META_DATA: continue
+            
+            meta = META_DATA[cls_id]
+            
+            # 同じクラスIDの予測を探す
+            matching_preds = [p for p in pred_list if p["class_id"] == cls_id]
+            
+            if not matching_preds:
+                continue # AIが見逃した場合はスキップ
+                
+            pred = matching_preds[0] # 見つかった予測の1つ目を使用
+            
+            # 数値計算
+            gt_val = calculate_meter_value(gt["kpts"], meta)
+            pred_val = calculate_meter_value(pred["kpts"], meta)
+            
+            error = abs(gt_val - pred_val)
+            
+            total_error += error
+            total_count += 1
+            if error > max_error:
+                max_error = error
+                max_error_file = f"{base_name} ({meta['name']})"
+                
+            unit = meta["unit"]
+            print(f"{base_name:<20} | {meta['name']:<15} | {gt_val:>6.2f} {unit:<3} | {pred_val:>6.2f} {unit:<3} | {error:>6.3f} {unit}")
+
+    print("-" * 75)
+    if total_count > 0:
+        avg_error = total_error / total_count
+        print(f"✅ 検証完了: {total_count} 個のメーターを照合しました。")
+        print(f"📊 平均誤差 (MAE) : {avg_error:.4f} (単位は各計器に依存)")
+        print(f"📈 最大誤差 (Max) : {max_error:.4f} -> 発生箇所: {max_error_file}")
     else:
-        print("計算できるデータがありませんでした。")
+        print("比較できるデータがありませんでした。")
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,9 @@
+# AIモデルやデータセットを除外
+*.pt
+*.zip
+
+# キャッシュや学習ログを除外
+runs/
+__pycache__/
+yolo_train_data_all/
+yolo_test_data_all/

@@ -1,0 +1,26 @@
+path: /content
+train: yolo_train_data_all/images
+val: yolo_test_data_all/images
+
+# クラス数 (0〜13の合計14個)
+nc: 14
+
+# クラス名 (メタデータの0番から順に並べる)
+names: [
+  'Pressure0to1',
+  'hPa970to1050',
+  'hPa970to1060',
+  'mmHg730to790',
+  'Thermo-30to50',
+  'Thermo-20to50',
+  'Thermo-10to40',
+  'Thermo0to120',
+  'Thermo10to40',
+  'Thermo20to110',
+  'Hygro0to100',
+  'Hygro10to100',
+  'Hygro40to100',
+  'rpm400to1800'
+]
+
+kpt_shape: [6, 3]
